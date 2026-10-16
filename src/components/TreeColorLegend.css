@@ -1,0 +1,74 @@
+.tree-color-legend {
+  position: absolute;
+  z-index: 3;
+  left: 16px;
+  bottom: 56px;
+  width: 194px;
+  box-sizing: border-box;
+  padding: 12px 14px;
+  border: 1px solid #ffffff35;
+  border-radius: 10px;
+  background: #111b16ed;
+  box-shadow: 0 5px 22px #0003;
+  color: #e1ece2;
+  pointer-events: auto;
+}
+
+.tree-color-legend-title {
+  margin: 0 0 10px;
+  color: #b9cdbd;
+  font: 9px 'DM Mono', monospace;
+  letter-spacing: 1px;
+  line-height: 1.3;
+  text-transform: uppercase;
+}
+
+.tree-color-legend-list {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.tree-color-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #e1ece2;
+  font-size: 11px;
+  line-height: 1.25;
+}
+
+.tree-color-legend-swatch {
+  display: inline-block;
+  flex: 0 0 11px;
+  width: 11px;
+  height: 11px;
+  border: 1px solid #ffffff4a;
+  border-radius: 50%;
+  box-shadow: 0 0 0 2px #ffffff0b;
+}
+
+@media (max-width: 680px) {
+  .tree-color-legend {
+    left: 10px;
+    bottom: 48px;
+    width: 176px;
+    padding: 10px 11px;
+  }
+
+  .tree-color-legend-title {
+    margin-bottom: 8px;
+    font-size: 8px;
+  }
+
+  .tree-color-legend-list {
+    gap: 6px;
+  }
+
+  .tree-color-legend-item {
+    gap: 7px;
+    font-size: 10px;
+  }
+}

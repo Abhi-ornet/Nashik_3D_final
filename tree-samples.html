@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Canopy · Tree Model Lab</title>
+  <style>
+    :root { color-scheme: light; font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif; color: #1f3327; background: #f1f4ef; }
+    * { box-sizing: border-box; }
+    body { margin: 0; min-height: 100vh; }
+    header { padding: 28px clamp(18px, 4vw, 54px) 22px; border-bottom: 1px solid #dbe2d8; background: #fbfcfa; }
+    .eyebrow { font-size: 11px; font-weight: 750; letter-spacing: .14em; color: #637d69; text-transform: uppercase; }
+    h1 { margin: 8px 0 6px; font-size: clamp(28px, 3.2vw, 42px); letter-spacing: -.045em; }
+    header p { margin: 0; max-width: 900px; color: #607065; line-height: 1.55; }
+    main { padding: 24px clamp(18px, 4vw, 54px) 40px; }
+    .topline { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; margin-bottom:18px; color:#65746a; font-size:13px; }
+    a { color:#2c704a; text-decoration:none; font-weight:650; }
+    a:hover { text-decoration:underline; }
+    .workspace { display:grid; grid-template-columns:minmax(0, 1.55fr) minmax(290px, .85fr); gap:18px; align-items:stretch; }
+    .stage { height:500px; position:relative; overflow:hidden; border:1px solid #dbe3d8; border-radius:18px; background:#e7ede4; box-shadow:0 5px 22px rgba(30,55,35,.055); }
+    .stage canvas { display:block; width:100%; height:100%; }
+    .stage .status { position:absolute; left:14px; bottom:12px; z-index:2; background:rgba(255,255,255,.9); color:#5d6d62; padding:7px 10px; border-radius:8px; font-size:11px; pointer-events:none; }
+    .panel { border:1px solid #dfe6dd; border-radius:18px; background:#fff; padding:23px; display:flex; flex-direction:column; min-width:0; }
+    .panel .tag { color:#66806b; text-transform:uppercase; letter-spacing:.12em; font-size:10px; font-weight:800; }
+    h2 { font-size:clamp(22px,2vw,28px); margin:7px 0 5px; letter-spacing:-.035em; line-height:1.12; }
+    .panel-desc { color:#667469; line-height:1.5; margin:0 0 18px; font-size:13px; }
+    .stats { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin:4px 0 18px; }
+    .stat { background:#f4f7f2; border:1px solid #e8eee5; border-radius:10px; padding:12px; }
+    .stat span { display:block; font-size:11px; color:#768378; margin-bottom:4px; }
+    .stat strong { display:block; font-size:18px; font-variant-numeric:tabular-nums; }
+    .filename { font:11px ui-monospace, SFMono-Regular, Consolas, monospace; color:#6b786e; overflow-wrap:anywhere; margin:0 0 16px; }
+    .actions { display:flex; flex-wrap:wrap; align-items:center; gap:15px; font-size:12px; }
+    .controls { display:flex; gap:8px; margin-top:auto; padding-top:24px; }
+    button { font:inherit; cursor:pointer; }
+    .nav-btn { border:1px solid #d7e0d4; background:#f7f9f6; color:#294333; border-radius:9px; padding:10px 13px; font-weight:700; }
+    .nav-btn:hover { background:#eaf1e7; }
+    .filters { display:flex; align-items:center; flex-wrap:wrap; gap:8px; margin:28px 0 15px; }
+    .filters span { color:#69786d; font-size:12px; margin-right:4px; }
+    .filter { border:1px solid #d9e2d6; background:#fbfcfa; color:#506256; padding:8px 12px; border-radius:99px; font-size:12px; font-weight:700; }
+    .filter[aria-pressed="true"] { border-color:#2b6843; background:#e5efe3; color:#245b39; }
+    .grid { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:13px; }
+    .card { background:#fff; border:1px solid #dfe6dd; border-radius:13px; overflow:hidden; min-width:0; transition:border-color .15s,box-shadow .15s,transform .15s; }
+    .card.selected { border-color:#43855a; box-shadow:0 0 0 2px rgba(67,133,90,.14); }
+    .card:hover { border-color:#a6b9a3; transform:translateY(-1px); }
+    .card-body { padding:14px; }
+    .card-top { display:flex; gap:7px; justify-content:space-between; align-items:flex-start; }
+    .card h3 { margin:0; font-size:14px; letter-spacing:-.015em; line-height:1.3; }
+    .kind { display:inline-block; margin-top:8px; border-radius:99px; padding:4px 7px; background:#f0f4ed; color:#607263; font-size:10px; font-weight:750; }
+    .tris { white-space:nowrap; border-radius:7px; padding:4px 6px; background:#edf5ea; color:#2e7048; font-size:10px; font-weight:800; }
+    .card small { display:block; margin:10px 0 12px; color:#7b877d; font-size:10px; font-variant-numeric:tabular-nums; }
+    .card-buttons { display:flex; gap:10px; align-items:center; justify-content:space-between; flex-wrap:wrap; }
+    .preview-btn { padding:7px 10px; border:1px solid #d9e3d7; border-radius:7px; background:#f7f9f6; color:#34553f; font-size:11px; font-weight:800; }
+    .card.selected .preview-btn { background:#2d7048; color:white; border-color:#2d7048; }
+    .download-link { font-size:11px; }
+    .note { margin-top:22px; padding:15px 17px; background:#e7eee4; border:1px solid #d6e0d2; border-radius:12px; color:#4f6255; line-height:1.55; font-size:13px; }
+    .note strong { color:#263e2d; }
+    footer { padding:0 clamp(18px,4vw,54px) 28px; font-size:12px; color:#77857a; }
+    @media (max-width:1200px) { .grid { grid-template-columns:repeat(3,minmax(0,1fr)); } }
+    @media (max-width:900px) { .workspace { grid-template-columns:1fr; } .stage { height:430px; } .panel { min-height:350px; } .grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+    @media (max-width:520px) { .grid { grid-template-columns:1fr; } .stage { height:340px; } .panel { padding:18px; } }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="eyebrow">Canopy · asset review</div>
+    <h1>Tree model lab</h1>
+    <p>Compare 16 downloadable tree models, from ultra-light low-poly silhouettes to detailed species models. Select any card to load it in the interactive 3D viewer. Drag to orbit; scroll to zoom. These files are samples only and are not connected to the live map.</p>
+  </header>
+  <main>
+    <div class="topline"><span>Only one WebGL viewer is active at a time to keep the gallery responsive.</span><a href="/models/samples/README.md" target="_blank" rel="noreferrer">Sources, license & full asset inventory ↗</a></div>
+    <section class="workspace" aria-label="Selected tree model preview">
+      <div class="stage" id="viewer-host"><div class="status" id="viewer-status">Preparing 3D viewer…</div></div>
+      <aside class="panel">
+        <div class="tag" id="selected-kind">Selected model</div>
+        <h2 id="selected-title">Loading tree samples…</h2>
+        <p class="panel-desc" id="selected-desc">The chosen GLB model will appear here.</p>
+        <div class="stats">
+          <div class="stat"><span>Triangles (approx.)</span><strong id="selected-triangles">—</strong></div>
+          <div class="stat"><span>GLB size</span><strong id="selected-size">—</strong></div>
+          <div class="stat"><span>Mesh objects</span><strong id="selected-meshes">—</strong></div>
+          <div class="stat"><span>Materials</span><strong id="selected-materials">—</strong></div>
+        </div>
+        <div class="filename" id="selected-filename"></div>
+        <div class="actions"><a id="selected-download" href="#" download>Download GLB ↓</a><a id="selected-source" href="#" target="_blank" rel="noreferrer">Original source ↗</a></div>
+        <div class="controls"><button class="nav-btn" id="previous-model" type="button">← Previous</button><button class="nav-btn" id="next-model" type="button">Next →</button></div>
+      </aside>
+    </section>
+    <div class="filters" role="group" aria-label="Filter tree models"><span>Show:</span><button class="filter" data-filter="all" aria-pressed="true">All 16</button><button class="filter" data-filter="low-poly" aria-pressed="false">Low-poly</button><button class="filter" data-filter="broadleaf" aria-pressed="false">Broadleaf</button><button class="filter" data-filter="conifer" aria-pressed="false">Conifers</button><button class="filter" data-filter="palm" aria-pressed="false">Palms</button><button class="filter" data-filter="detailed" aria-pressed="false">Detailed / high-poly</button></div>
+    <div class="grid" id="model-grid" aria-label="Available tree models"></div>
+    <div class="note"><strong>What to compare:</strong> canopy silhouette, trunk/branch naturalness, material style, triangle count, file size, and whether the look fits your city-tree map. Some of the 10k–213k triangle models are deliberately included as detailed references, not as a recommendation to render hundreds of them simultaneously. Existing production model mappings are unchanged.</div>
+  </main>
+  <footer>Sources include Quaternius Stylized Nature MegaKit and the Innerscene CC0 tree library. Verify source links before redistributing assets outside this review project.</footer>
+  <script type="module" src="/src/tree-samples-preview.js"></script>
+</body>
+</html>
