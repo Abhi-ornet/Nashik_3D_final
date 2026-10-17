@@ -1,6 +1,7 @@
 import react from '@vitejs/plugin-react';
 import { fileURLToPath } from 'node:url';
 import { defineConfig } from 'vite';
+import { GEOSERVER_CONFIG } from './src/config/geoserverConfig.js';
 
 export default defineConfig({
   plugins: [react()],
@@ -15,9 +16,9 @@ export default defineConfig({
   server: {
     host: '127.0.0.1',
     proxy: {
-      // Browser requests /geoserver/... from Vite; Vite forwards them to local GeoServer.
+      // Proxies /geoserver requests in local dev to prevent CORS errors
       '/geoserver': {
-        target: 'http://localhost:8081',
+        target: GEOSERVER_CONFIG.targetServer,
         changeOrigin: true,
       },
     },

@@ -1,3 +1,5 @@
+import { TREE_LAYER } from '../config/mapConfig.js';
+
 export default function InventorySidebar({
   status,
   totalTrees,
@@ -61,7 +63,7 @@ export default function InventorySidebar({
         </section>
         <footer className="sidebar-footer">
           <div className="status-indicator" />
-          <div><strong>{status}</strong><small>GeoServer · test:nashiktreecensus · CC0 GLB models</small></div>
+          <div><strong>{status}</strong><small>GeoServer · {TREE_LAYER} · CC0 GLB models</small></div>
         </footer>
       </aside>
   );

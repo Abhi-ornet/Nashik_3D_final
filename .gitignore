@@ -12,6 +12,9 @@ public/cesium/
 dist
 dist-ssr
 *.local
+.env
+.env.*
+!.env.example
 
 # Temporary local inspection/test artifacts
 temp/

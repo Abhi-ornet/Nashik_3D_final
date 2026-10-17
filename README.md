@@ -2,26 +2,61 @@
 
 Map-first 3D tree inventory using React, Vite, MapLibre GL JS, and Three.js.
 
-## Run locally on Windows
+## Development & Deployment Guide
 
-    npm install
-    npm run dev
+All GeoServer settings (workspace, layer, target server, and proxy mode) are centralized in `src/config/geoserverConfig.js` and can be configured using environment variables (`.env`).
 
-Open the URL printed by Vite. Vite proxies `/geoserver/*` to `http://localhost:8081/geoserver/*` for local development.
+### 1. Local Development (`npm run dev`)
 
-## Live tree source
+In local development, the browser makes requests through Vite's local dev proxy (`/geoserver/ows` ➡️ `targetServer`), which **prevents browser CORS errors**.
 
-The app queries GeoServer's working feature type:
+1. Copy `.env.example` to `.env`:
+   ```bash
+   cp .env.example .env
+   ```
+2. Configure your local `.env`:
+   ```env
+   VITE_GEOSERVER_TARGET_SERVER=http://127.0.0.1:8081
+   VITE_GEOSERVER_WORKSPACE=test
+   VITE_GEOSERVER_LAYER_NAME=nashiktreecensus
+   VITE_USE_PROXY=true
+   ```
+3. Run the dev server:
+   ```bash
+   npm install
+   npm run dev
+   ```
+4. Open the printed URL (e.g., `http://localhost:5173`). Vite proxies `/geoserver/*` requests to your local GeoServer.
 
-- Workspace/layer: `test:nashiktreecensus`
-- Endpoint: `/geoserver/ows`
-- Protocol: WFS 2.0.0, GeoJSON responses
-- Spatial filter: a CQL BBOX(geom, west, south, east, north, 'CRS:84') predicate built from the current viewport (this GeoServer rejects a separate bbox and CQL_FILTER parameter in one request)
-- Paging: fetches viewport matches in pages up to a zoom-dependent POC cap.
-- Attribute filtering: `CQL_FILTER` combines the spatial BBOX with selected tree group and health.
-- Normalization: WFS Point coordinates become `x=longitude`, `y=latitude`; HealthCondition, LocalName, Specie, Height, Girth, Canopy, heritage flag, and WardNameOrNum are mapped for display.
+---
 
-The previously inspected `nashiktreecensus:nashiktreecensus` layer returned a SQLite missing-table error. The app uses `test:nashiktreecensus`, which returned features during inspection.
+### 2. Production Deployment (`npm run build`)
+
+In production, you usually do **not** run a proxy on your frontend web server. Setting `VITE_USE_PROXY=false` ensures the app calls your real GeoServer URL directly (`https://your-geoserver.com/geoserver/ows`), instead of sending requests to your frontend server.
+
+1. On your deployment server / CI/CD pipeline, create a `.env` file before building:
+   ```env
+   # Your production GeoServer URL
+   VITE_GEOSERVER_TARGET_SERVER=https://your-production-geoserver.com
+
+   # Set to false so the app connects directly to GeoServer without proxy
+   VITE_USE_PROXY=false
+
+   # Production workspace and layer name
+   VITE_GEOSERVER_WORKSPACE=your_production_workspace
+   VITE_GEOSERVER_LAYER_NAME=your_production_layer
+   ```
+2. Build the production bundle:
+   ```bash
+   npm run build
+   ```
+   Vite will bake your secret production GeoServer URL and layer name directly into the compiled files in `dist/`.
+
+3. Deploy the `dist/` folder to your static hosting (Nginx, Apache, S3, Vercel, Netlify, etc.).
+
+> [!NOTE]
+> `.env` is included in `.gitignore`, so your production GeoServer URLs and layer names will never be committed or leaked to your Git repository.
+
 
 ## Rendering
 

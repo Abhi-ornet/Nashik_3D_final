@@ -1,6 +1,6 @@
 // Central configuration for the Nashik map, GeoServer queries, and interactions.
-export const WFS_URL = '/geoserver/ows';
-export const TREE_LAYER = 'test:nashiktreecensus';
+import { GEOSERVER_CONFIG, WFS_URL, TREE_LAYER, GEOMETRY_COLUMN } from './geoserverConfig.js';
+export { GEOSERVER_CONFIG, WFS_URL, TREE_LAYER, GEOMETRY_COLUMN };
 
 export const SATELLITE_SOURCE_ID = 'satellite-imagery-source';
 export const SATELLITE_LAYER_ID = 'satellite-imagery-layer';

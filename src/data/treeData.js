@@ -1,6 +1,8 @@
 // GeoServer WFS property projection and normalization into the app's tree view model.
+import { GEOMETRY_COLUMN, GEOSERVER_CONFIG } from '../config/geoserverConfig.js';
+
 export const PROPERTY_NAMES = [
-  'geom',
+  GEOMETRY_COLUMN,
   'Tree_UID',
   'Height',
   'LocalName',
@@ -103,8 +105,7 @@ export function getCqlFilter(filters, bounds) {
   // This GeoServer rejects the BBOX parameter and CQL_FILTER together, so combine
   // the spatial predicate and optional attribute filters into one CQL expression.
   const clauses = [
-    "BBOX(geom," + bounds.getWest() + "," + bounds.getSouth() + "," +
-      bounds.getEast() + "," + bounds.getNorth() + ",'CRS:84')",
+    `BBOX(${GEOMETRY_COLUMN},${bounds.getWest()},${bounds.getSouth()},${bounds.getEast()},${bounds.getNorth()},'${GEOSERVER_CONFIG.srsName}')`,
   ];
   if (filters.species !== 'all') {
     clauses.push("Specie = '" + filters.species + "'");
