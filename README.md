@@ -30,32 +30,59 @@ In local development, the browser makes requests through Vite's local dev proxy 
 
 ---
 
-### 2. Production Deployment (`npm run build`)
+### 2. Deployment on Render (Recommended)
 
-In production, you usually do **not** run a proxy on your frontend web server. Setting `VITE_USE_PROXY=false` ensures the app calls your real GeoServer URL directly (`https://your-geoserver.com/geoserver/ows`), instead of sending requests to your frontend server.
+When deploying to Render (or any cloud Node host), use the built-in [`server.js`](server.js). It serves your production build from `dist/` and proxies `/geoserver/*` requests with automatic CORS headers, so your users never face CORS blocks.
 
-1. On your deployment server / CI/CD pipeline, create a `.env` file before building:
+#### Step-by-Step Render Setup:
+
+1. **Push your code to GitHub / GitLab**.
+   (`.env` is ignored by `.gitignore` so your private servers and keys are never committed).
+
+2. **Create a Web Service on Render**:
+   - Go to [dashboard.render.com](https://dashboard.render.com) ➡️ **New** ➡️ **Web Service**.
+   - Connect your Git repository.
+
+3. **Configure Build & Start Commands**:
+   - **Environment**: `Node`
+   - **Build Command**:
+     ```bash
+     npm install && npm run build
+     ```
+   - **Start Command**:
+     ```bash
+     npm start
+     ```
+     *(Runs `node server.js` which listens on `0.0.0.0` and Render's dynamic `$PORT`)*.
+
+4. **Add Environment Variables** (in Render Dashboard ➡️ **Environment** tab):
+   | Key | Value | Description |
+   |---|---|---|
+   | `VITE_GEOSERVER_TARGET_SERVER` | `https://your-geoserver.com` | Your real GeoServer host address |
+   | `VITE_USE_PROXY` | `true` | Tells the app to route requests through `server.js` to avoid CORS |
+   | `VITE_GEOSERVER_WORKSPACE` | `your_workspace` | Production GeoServer workspace name |
+   | `VITE_GEOSERVER_LAYER_NAME` | `your_layer` | Production layer name |
+   | `VITE_CESIUM_ION_ACCESS_TOKEN` | *(optional)* | Cesium ion token for 3D OSM buildings |
+
+5. **Deploy**:
+   Click **Create Web Service** (or **Manual Deploy**). Render will build the app, launch `server.js`, and your map will be live!
+
+---
+
+### 3. Alternative: Static Deployment (Vercel, Netlify, S3, Cloudflare Pages)
+
+If you are hosting only static HTML/JS without a Node server:
+1. In your deployment environment variables, set:
    ```env
-   # Your production GeoServer URL
-   VITE_GEOSERVER_TARGET_SERVER=https://your-production-geoserver.com
-
-   # Set to false so the app connects directly to GeoServer without proxy
+   VITE_GEOSERVER_TARGET_SERVER=https://your-geoserver.com
    VITE_USE_PROXY=false
-
-   # Production workspace and layer name
-   VITE_GEOSERVER_WORKSPACE=your_production_workspace
-   VITE_GEOSERVER_LAYER_NAME=your_production_layer
+   VITE_GEOSERVER_WORKSPACE=your_workspace
+   VITE_GEOSERVER_LAYER_NAME=your_layer
    ```
-2. Build the production bundle:
-   ```bash
-   npm run build
-   ```
-   Vite will bake your secret production GeoServer URL and layer name directly into the compiled files in `dist/`.
+2. Build command: `npm run build`
+3. Publish directory: `dist`
+4. Make sure your remote GeoServer has CORS enabled (`Access-Control-Allow-Origin`).
 
-3. Deploy the `dist/` folder to your static hosting (Nginx, Apache, S3, Vercel, Netlify, etc.).
-
-> [!NOTE]
-> `.env` is included in `.gitignore`, so your production GeoServer URLs and layer names will never be committed or leaked to your Git repository.
 
 
 ## Rendering
