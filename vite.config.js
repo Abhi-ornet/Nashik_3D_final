@@ -14,7 +14,8 @@ export default defineConfig({
     },
   },
   server: {
-    host: '127.0.0.1',
+    host: '0.0.0.0',
+    allowedHosts: true,
     proxy: {
       // Proxies /geoserver requests in local dev to prevent CORS errors
       '/geoserver': {
@@ -22,5 +23,10 @@ export default defineConfig({
         changeOrigin: true,
       },
     },
+  },
+  preview: {
+    host: '0.0.0.0',
+    port: process.env.PORT ? Number(process.env.PORT) : 4173,
+    allowedHosts: true,
   },
 });

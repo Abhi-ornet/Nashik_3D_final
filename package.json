@@ -9,7 +9,7 @@
     "prebuild": "node scripts/copy-cesium-assets.mjs",
     "build": "vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview --host 0.0.0.0 --port $PORT"  
   },
   "dependencies": {
     "cesium": "^1.146.0",
