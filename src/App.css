@@ -92,37 +92,3 @@ select:focus { border-color: #83b88a; }
 
 .map-container-hidden { visibility: hidden; pointer-events: none; }
 .basemap-option { white-space: nowrap; }
-.cesium-icon { font-size: 21px; line-height: 17px; }
-.cesium-view-shell { position: absolute; inset: 0; z-index: 1; background: #0d171d; }
-.cesium-globe-container { position: absolute; inset: 0; overflow: hidden; }
-.cesium-mode-chip { position: absolute; z-index: 2; top: 19px; left: 19px; display: flex; align-items: center; gap: 8px; padding: 11px 13px; border: 1px solid #ffffff30; border-radius: 8px; background: #111b16e8; box-shadow: 0 4px 20px #0002; color: #e1ece2; font: 10px 'DM Mono', monospace; letter-spacing: .6px; pointer-events: none; }
-.cesium-mode-chip span:not(.cesium-mode-dot) { color: #6e8273; }
-.cesium-mode-dot { width: 6px; height: 6px; border-radius: 50%; background: #88ce91; box-shadow: 0 0 10px #88ce9150; }
-.cesium-mode-note { position: absolute; z-index: 2; left: 50%; bottom: 19px; transform: translateX(-50%); display: flex; gap: 8px; white-space: nowrap; padding: 10px 13px; border: 1px solid #ffffff35; border-radius: 8px; background: #111b16e8; color: #d1ded3; font-size: 10px; pointer-events: none; }
-.cesium-mode-note span { color: #809587; }
-.cesium-loading { position: absolute; z-index: 4; inset: 0; display: grid; place-items: center; background: #142019; color: #dce8dd; font-size: 13px; }
-.cesium-view-shell .cesium-viewer,
-.cesium-view-shell .cesium-viewer-cesiumWidgetContainer,
-.cesium-view-shell .cesium-widget,
-.cesium-view-shell .cesium-widget canvas { width: 100%; height: 100%; }
-.cesium-view-shell .cesium-viewer { overflow: hidden; }
-.cesium-view-shell .cesium-viewer-bottom { bottom: 30px; }
-.cesium-view-shell .cesium-widget-credits { color: #fff; text-shadow: 0 1px 4px #000; }
-.cesium-view-shell .cesium-viewer-toolbar { top: 122px; right: 10px; }
-.cesium-view-shell .cesium-sceneModePicker-wrapper { display: block; }
-.cesium-view-shell .cesium-viewer-toolbar > * { margin-bottom: 5px; }
-@media (max-width: 800px) {
-  .basemap-switch { gap: 2px; }
-  .basemap-option { padding-inline: 9px; }
-}
-@media (max-width: 580px) {
-  .basemap-switch { top: 50px; left: 10px; max-width: calc(100% - 20px); }
-  .basemap-option { gap: 4px; padding: 7px 8px; font-size: 9px; }
-  .basemap-option-icon { width: 13px; }
-  .cesium-mode-chip { top: 10px; left: 10px; padding: 8px 9px; font-size: 8px; }
-  .cesium-mode-note { bottom: 12px; left: 10px; right: 10px; transform: none; justify-content: center; flex-wrap: wrap; white-space: normal; gap: 4px; font-size: 8px; padding: 9px; }
-}
-
-/* Hide MapLibre UI that can otherwise overlay the Cesium canvas. */
-.map-container-hidden .maplibregl-ctrl { visibility: hidden !important; }
-.map-container-hidden + .map-top-chip { visibility: hidden; }

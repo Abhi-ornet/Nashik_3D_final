@@ -1,0 +1,9 @@
+npm warn "Get-Content lint-out.txt -Tail 35;" is being parsed as a normal command line argument.
+npm warn Unknown cli config "--NoProfile". This will stop working in the next major version of npm.
+npm warn Unknown cli config "--Command". This will stop working in the next major version of npm.
+
+> canopy-3d-tree-map-poc@0.0.0 lint
+> oxlint ; echo LINT_EXIT:0; powershell Get-Content lint-out.txt -Tail 35; del lint-out.txt
+
+No files found to lint. Please check your paths and ignore patterns.
+Finished in 14ms on 0 files with 96 rules using 12 threads.

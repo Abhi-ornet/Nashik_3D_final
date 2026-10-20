@@ -7,9 +7,6 @@ export default function MapModeControls({ viewMode, onChange }) {
           <button type="button" className={viewMode === 'satellite' ? 'basemap-option active' : 'basemap-option'} aria-pressed={viewMode === 'satellite'} onClick={() => onChange('satellite')}>
             <span className="basemap-option-icon satellite-icon" aria-hidden="true">◉</span> Satellite
           </button>
-          <button type="button" className={viewMode === 'cesium' ? 'basemap-option active' : 'basemap-option'} aria-pressed={viewMode === 'cesium'} onClick={() => onChange('cesium')}>
-            <span className="basemap-option-icon cesium-icon" aria-hidden="true">◎</span> Cesium 3D
-          </button>
         </div>
   );
 }

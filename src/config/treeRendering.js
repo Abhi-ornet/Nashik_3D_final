@@ -28,13 +28,6 @@ export const TREE_MODELS = {
 };
 
 
-// Cesium entity models use known source heights to scale the downloaded GLBs.
-export const CESIUM_TREE_MODELS = {
-  maple: { url: TREE_MODELS.maple, height: 9.605 },
-  oak: { url: TREE_MODELS.oak, height: 8.836 },
-  linden: { url: TREE_MODELS.linden, height: 9.463 },
-  palm: { url: TREE_MODELS.palm, height: 9.318 },
-};
 
 // Detail-zoom replacements are intentionally small and shared across many instances.
 // Three Common Tree variants plus Palm Light replace the multi-MB detailed-leaf assets.

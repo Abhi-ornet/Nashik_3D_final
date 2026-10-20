@@ -4,16 +4,13 @@
   "version": "0.0.0",
   "type": "module",
   "scripts": {
-    "predev": "node scripts/copy-cesium-assets.mjs",
     "dev": "vite",
-    "prebuild": "node scripts/copy-cesium-assets.mjs",
     "build": "vite build",
     "start": "node server.js",
     "lint": "oxlint",
-    "preview": "vite preview --host 0.0.0.0 --port $PORT"  
+    "preview": "vite preview --host 0.0.0.0 --port $PORT"
   },
   "dependencies": {
-    "cesium": "^1.146.0",
     "maplibre-gl": "^6.14.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",

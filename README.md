@@ -62,7 +62,6 @@ When deploying to Render (or any cloud Node host), use the built-in [`server.js`
    | `VITE_USE_PROXY` | `true` | Tells the app to route requests through `server.js` to avoid CORS |
    | `VITE_GEOSERVER_WORKSPACE` | `your_workspace` | Production GeoServer workspace name |
    | `VITE_GEOSERVER_LAYER_NAME` | `your_layer` | Production layer name |
-   | `VITE_CESIUM_ION_ACCESS_TOKEN` | *(optional)* | Cesium ion token for 3D OSM buildings |
 
 5. **Deploy**:
    Click **Create Web Service** (or **Manual Deploy**). Render will build the app, launch `server.js`, and your map will be live!
@@ -87,7 +86,7 @@ If you are hosting only static HTML/JS without a Node server:
 
 ## Rendering
 
-- Map view uses OpenFreeMap Liberty, Satellite switches on Esri World Imagery raster tiles, and Cesium 3D launches a separate CesiumJS globe with a low, oblique camera over Nashik. Cesium queries WFS around the visible area (with a forward-projected fallback for low-angle views), renders reusable GLB tree models at census heights, and shares the health/group filters and tree details. Cesium uses an ellipsoid globe and Esri imagery without a token; optional OSM 3D buildings can be enabled with your own Cesium ion token. Cesium static workers, assets, and widgets are copied to public/cesium before development/build runs and that generated folder is git-ignored.
+- Map view uses OpenFreeMap Liberty, and Satellite switches on Esri World Imagery raster tiles.
 - Three.js is integrated through src/map/createTreeLayer.js, a custom MapLibre 3D layer.
 - Map/query settings are in src/config/mapConfig.js; tree models, health blending, LOD, and lighting are in src/config/treeRendering.js.
 - WFS normalization and CQL filtering live in src/data/treeData.js; reusable UI sections live in src/components/.
@@ -95,13 +94,6 @@ If you are hosting only static HTML/JS without a Node server:
 - Panning or zooming debounces the WFS query; a new request aborts any stale request.
 - UI displays the global count GeoServer reports, viewport match count, loaded count, and any viewport cap.
 
-## Optional Cesium 3D buildings
-
-To add the global OSM 3D building layer in Cesium mode, create an .env.local file in the project root and set your own Cesium ion access token:
-
-    VITE_CESIUM_ION_ACCESS_TOKEN=your_token_here
-
-Restart the Vite dev server after changing the variable. The token is optional and .env.local is ignored by Git. With a token, Cesium loads OSM building tiles and World Terrain; tree models are clamped to the ground. Without it, tree GLBs render over Esri imagery on the ellipsoid, with no 3D buildings or terrain.
 ## Development-only notes
 
 The synthetic dataset `public/data/trees-central-park-10000.json` and `scripts/generate_sample_trees.py` are preserved as fallback/test data but are no longer the active source. Temporary GeoServer inspection output belongs in `temp/geoserver-inspection/` and is git-ignored.
@@ -112,10 +104,9 @@ Tree GLBs and source/license links are documented in `public/models/README.md`. 
 
 - src/config/mapConfig.js centralizes map defaults, service endpoints, and WFS paging/debounce limits.
 - src/config/treeRendering.js centralizes tree model paths, LOD threshold/count, leaf material, health blend, lighting, renderer exposure, model scaling, and per-instance variation.
-- src/data/treeData.js owns WFS property projection, tree normalization/model selection, and CQL filter generation shared by MapLibre and Cesium.
+- src/data/treeData.js owns WFS property projection, tree normalization/model selection, and CQL filter generation used by the MapLibre tree map.
 - src/map/createTreeLayer.js owns the Three.js custom MapLibre layer and model instancing.
 - src/components/ contains the inventory sidebar, map-mode controls, and selected-tree details panel.
-- Cesium-specific WFS paging caps are in src/config/mapConfig.js and its model path/height registry is in src/config/treeRendering.js.
 
 ## Reviewing alternative tree models
 

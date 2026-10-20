@@ -1,4 +1,4 @@
-import { lazy, Suspense, useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 
 import { createTreeLayer } from './map/createTreeLayer.js';
@@ -26,8 +26,6 @@ import MapModeControls from './components/MapModeControls.jsx';
 import TreeColorLegend from './components/TreeColorLegend.jsx';
 import TreeDetailsPopup from './components/TreeDetailsPopup.jsx';
 
-const CesiumGlobe = lazy(() => import('./CesiumGlobe.jsx'));
-
 export default function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
@@ -49,7 +47,6 @@ export default function App() {
   const [treesEnabled, setTreesEnabled] = useState(true);
   const [viewMode, setViewMode] = useState('satellite');
   const viewModeRef = useRef('satellite');
-  const cesiumControlsRef = useRef(null);
 
   filtersRef.current = { health: healthFilter, species: speciesFilter, enabled: treesEnabled };
   viewModeRef.current = viewMode;
@@ -67,7 +64,7 @@ export default function App() {
 
   const loadViewport = useCallback(async () => {
     const map = mapRef.current;
-    if (!map || !map.isStyleLoaded() || viewModeRef.current === 'cesium') return;
+    if (!map || !map.isStyleLoaded()) return;
 
     if (activeRequestRef.current) activeRequestRef.current.abort();
     const controller = new AbortController();
@@ -271,9 +268,7 @@ export default function App() {
 
   const focusTree = (tree) => {
     if (!tree) return;
-    if (viewModeRef.current === 'cesium' && cesiumControlsRef.current) {
-      cesiumControlsRef.current.flyToTree(tree);
-    } else if (mapRef.current) {
+    if (mapRef.current) {
       mapRef.current.flyTo({ center: [tree.x, tree.y], zoom: 19, pitch: FOCUS_PITCH, duration: 850 });
     }
     setSelectedTree(tree);
@@ -287,26 +282,9 @@ export default function App() {
     if (map && map.getLayer(SATELLITE_LAYER_ID)) {
       map.setLayoutProperty(SATELLITE_LAYER_ID, 'visibility', mode === 'satellite' ? 'visible' : 'none');
     }
-    if (mode === 'cesium') {
-      if (activeRequestRef.current) activeRequestRef.current.abort();
-    } else {
-      // Filters may have changed while Cesium was active; refresh MapLibre on return.
-      fetchViewportRef.current();
-    }
+    fetchViewportRef.current();
   };
 
-  const handleCesiumSelect = useCallback((tree) => {
-    setSelectedTree(tree);
-    if (treeLayerRef.current) treeLayerRef.current.setSelected(tree ? tree.id : null);
-  }, []);
-  const handleCesiumStatus = useCallback((nextStatus) => setStatus(nextStatus), []);
-  const handleCesiumCounts = useCallback(({ matched, loaded }) => {
-    setMatchedInViewport(matched);
-    setLoadedInViewport(loaded);
-  }, []);
-  const handleCesiumReady = useCallback((controls) => {
-    cesiumControlsRef.current = controls;
-  }, []);
 
   return (
     <main className="app-shell">
@@ -324,23 +302,10 @@ export default function App() {
       />
 
       <section className="map-panel">
-        <div ref={mapElementRef} className={"map-container" + (viewMode === 'cesium' ? ' map-container-hidden' : '')} />
+        <div ref={mapElementRef} className="map-container" />
         <div className="map-top-chip"><span className="chip-dot" /> NASHIK <span className="chip-divider">/</span> MAHARASHTRA, INDIA</div>
         <MapModeControls viewMode={viewMode} onChange={setView} />
         <TreeColorLegend />
-        {viewMode === 'cesium' && (
-          <Suspense fallback={<div className="cesium-loading">Loading CesiumJS globe…</div>}>
-            <CesiumGlobe
-              healthFilter={healthFilter}
-              speciesFilter={speciesFilter}
-              treesEnabled={treesEnabled}
-              onSelect={handleCesiumSelect}
-              onStatus={handleCesiumStatus}
-              onCounts={handleCesiumCounts}
-              onReady={handleCesiumReady}
-            />
-          </Suspense>
-        )}
         <div className="map-bottom-note">Drag to explore <span>·</span> Scroll to zoom <span>·</span> Click a tree to inspect</div>
         <TreeDetailsPopup
           tree={selectedTree}
@@ -350,7 +315,7 @@ export default function App() {
           }}
           onFocus={() => focusTree(selectedTree)}
         />
-        <div className="map-attribution">{viewMode === 'cesium' ? 'CESIUMJS GLOBE · ESRI WORLD IMAGERY' : viewMode === 'satellite' ? 'SATELLITE IMAGERY · ESRI WORLD IMAGERY' : 'TREE DATA: GEOSERVER · BASEMAP: OPENFREEMAP / OSM'}</div>
+        <div className="map-attribution">{viewMode === 'satellite' ? 'SATELLITE IMAGERY · ESRI WORLD IMAGERY' : 'TREE DATA: GEOSERVER · BASEMAP: OPENFREEMAP / OSM'}</div>
       </section>
     </main>
   );

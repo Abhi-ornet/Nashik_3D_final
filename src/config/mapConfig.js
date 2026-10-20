@@ -28,8 +28,4 @@ export function getViewportRecordLimit(zoom) {
   return VIEWPORT_RECORD_CAPS.find((limit) => zoom >= limit.minZoom)?.maxRecords ?? 1500;
 }
 
-// Separate Cesium entity-model workload limits (the globe uses one entity per tree).
-export const CESIUM_PAGE_SIZE = 120;
-export const CESIUM_MAX_TREES = 120;
-export const CESIUM_START_HEIGHT_METERS = 350;
-export const CESIUM_IMAGE_MAX_LEVEL = 19;
+
