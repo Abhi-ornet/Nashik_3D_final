@@ -31,11 +31,11 @@ export const GEOSERVER_CONFIG = {
   // When useProxy is false -> connects directly to targetServer (e.g. 'https://.../geoserver/ows')
   url: useProxy ? (getEnv('VITE_GEOSERVER_URL') || '/geoserver/ows') : directUrl,
 
-  // Workspace name in GeoServer (e.g. 'test' locally, or your production workspace from .env)
-  workspace: getEnv('VITE_GEOSERVER_WORKSPACE', 'test'),
+  // Default workspace in GeoServer (used when no ?citycode= or ?workspace= URL parameter is provided)
+  workspace: getEnv('VITE_DEFAULT_WORKSPACE') || getEnv('VITE_GEOSERVER_WORKSPACE', 'nashiktreecensus'),
 
-  // Layer name in GeoServer
-  layerName: getEnv('VITE_GEOSERVER_LAYER_NAME', 'nashiktreecensus'),
+  // Default layer name in GeoServer (used when no ?citycode= or ?layer= URL parameter is provided)
+  layerName: getEnv('VITE_DEFAULT_LAYER_NAME') || getEnv('VITE_GEOSERVER_LAYER_NAME', 'nashiktreecensus'),
 
   // Geometry column name in layer
   geometryColumn: getEnv('VITE_GEOSERVER_GEOMETRY_COLUMN', 'geom'),

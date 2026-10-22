@@ -1,14 +1,57 @@
 # Canopy — 3D Tree Map POC
 
-Map-first 3D tree inventory using React, Vite, MapLibre GL JS, and Three.js.
+Map-first 3D tree inventory and census visualization using React, Vite, MapLibre GL JS, and Three.js.
 
-## Development & Deployment Guide
+---
 
-All GeoServer settings (workspace, layer, target server, and proxy mode) are centralized in `src/config/geoserverConfig.js` and can be configured using environment variables (`.env`).
+## Key Features
+
+- **Density-Based Multi-Tier LOD**: Automatically transitions between high-detail 3D models, mid-tier street trees, ultra-low-poly showcase conifers, and 2D WMS raster tiles based on **viewport tree density** rather than arbitrary zoom levels. Camera pitch/tilt is preserved across all tiers.
+- **Dynamic Multi-City / Multi-Workspace Support**: Supports multiple cities and GeoServer workspaces on the fly via URL search parameters (`?citycode=tmc`, `?workspace=...`, `?layer=...`, `?lat=...&long=...`).
+- **Ward Boundary Visualizations**: Automatically fetches and draws municipal boundary polygons from local KML datasets (`/kml/${citycode}_kml.kml`).
+- **Realistic 3D Instancing & Foliage Color Tinting**: High-performance Three.js GPU instancing (`THREE.InstancedMesh`) with property-driven health and appearance color blending (Healthy, Dead, Dangerous, Heritage, Exotic).
+- **Inspection & Detail Fly-To**: Smooth camera animations to inspect individual trees with full census metadata (Girth, Canopy, Height, Condition, Age Group, Tree Photo, Ward).
+
+---
+
+## Density-Based Level of Detail (LOD) Architecture
+
+Layer activation and model detail transitions are governed **strictly by the number of trees in the current viewport**, giving users smooth 60 FPS performance regardless of zoom level:
+
+| Tier | Tree Count Threshold | Rendering Mode | Model Assets Used |
+| :--- | :--- | :--- | :--- |
+| **Tier 1: Detailed 3D** | `≤ 5,000` trees | Three.js 3D Instancing | Quaternius Common Trees (1, 2, 3), Palm Light, and Stump Cut model (`tree-cut.glb`) for dead/cut trees. |
+| **Tier 2: Mid 3D** | `5,001 – 7,500` trees | Three.js 3D Instancing | Base Street Trees (`maple`, `oak`, `linden`, `palm-light`). |
+| **Tier 3: Showcase Low-Poly 3D** | `7,501 – 16,000` trees | Three.js 3D Instancing | Ultra-low-poly Conical Pine (80 tris) and Layered Fir (108 tris) for bird's-eye 3D canopy massing. |
+| **Tier 4: 2D Overview** | `> 16,000` trees | GeoServer WMS Raster | 2D raster image tiles (`wms-tree-2d-layer`) for zero-overhead city-wide views. |
+
+---
+
+## Dynamic URL Parameters
+
+Canopy dynamically loads data for different municipalities, coordinates, and GeoServer workspaces:
+
+| Parameter | Example | Description |
+| :--- | :--- | :--- |
+| `citycode` | `?citycode=tmc` | Automatically loads `/kml/tmc_kml.kml` and sets workspace/layer to `tmctreecensus:tmctreecensus`. |
+| `workspace` | `?workspace=nashiktreecensus` | Overrides the active GeoServer workspace name. |
+| `layer` | `?layer=nashiktreecensus` | Overrides the active GeoServer layer name. |
+| `lat` & `long` | `?lat=19.218&long=72.978` | Overrides initial camera coordinates and centers the map directly. |
+
+Examples:
+- `http://localhost:5173/?citycode=tmc` (Thane Municipal Corporation)
+- `http://localhost:5173/?citycode=nashik` (Nashik Municipal Corporation)
+- `http://localhost:5173/?citycode=panvel&lat=18.99&long=73.11`
+
+---
+
+## Development & Deployment Quickstart
+
+For full deployment instructions, see the dedicated [`DEPLOYMENT.md`](DEPLOYMENT.md) guide.
 
 ### 1. Local Development (`npm run dev`)
 
-In local development, the browser makes requests through Vite's local dev proxy (`/geoserver/ows` ➡️ `targetServer`), which **prevents browser CORS errors**.
+In local development, the browser makes requests through Vite's local dev proxy (`/geoserver/*` ➡️ `targetServer`), which **prevents browser CORS errors**.
 
 1. Copy `.env.example` to `.env`:
    ```bash
@@ -16,98 +59,34 @@ In local development, the browser makes requests through Vite's local dev proxy 
    ```
 2. Configure your local `.env`:
    ```env
-   VITE_GEOSERVER_TARGET_SERVER=http://127.0.0.1:8081
-   VITE_GEOSERVER_WORKSPACE=test
-   VITE_GEOSERVER_LAYER_NAME=nashiktreecensus
+   VITE_GEOSERVER_TARGET_SERVER=https://www.ornettreecensus.com
    VITE_USE_PROXY=true
+
+   # Default workspace and layer loaded when no ?citycode= or ?workspace= URL parameter is provided:
+   VITE_DEFAULT_WORKSPACE=nashiktreecensus
+   VITE_DEFAULT_LAYER_NAME=nashiktreecensus
    ```
 3. Run the dev server:
    ```bash
    npm install
    npm run dev
    ```
-4. Open the printed URL (e.g., `http://localhost:5173`). Vite proxies `/geoserver/*` requests to your local GeoServer.
+4. Open the printed URL (e.g., `http://localhost:5173`).
 
 ---
 
-### 2. Deployment on Render (Recommended)
+## Code Organization
 
-When deploying to Render (or any cloud Node host), use the built-in [`server.js`](server.js). It serves your production build from `dist/` and proxies `/geoserver/*` requests with automatic CORS headers, so your users never face CORS blocks.
-
-#### Step-by-Step Render Setup:
-
-1. **Push your code to GitHub / GitLab**.
-   (`.env` is ignored by `.gitignore` so your private servers and keys are never committed).
-
-2. **Create a Web Service on Render**:
-   - Go to [dashboard.render.com](https://dashboard.render.com) ➡️ **New** ➡️ **Web Service**.
-   - Connect your Git repository.
-
-3. **Configure Build & Start Commands**:
-   - **Environment**: `Node`
-   - **Build Command**:
-     ```bash
-     npm install && npm run build
-     ```
-   - **Start Command**:
-     ```bash
-     npm start
-     ```
-     *(Runs `node server.js` which listens on `0.0.0.0` and Render's dynamic `$PORT`)*.
-
-4. **Add Environment Variables** (in Render Dashboard ➡️ **Environment** tab):
-   | Key | Value | Description |
-   |---|---|---|
-   | `VITE_GEOSERVER_TARGET_SERVER` | `https://your-geoserver.com` | Your real GeoServer host address |
-   | `VITE_USE_PROXY` | `true` | Tells the app to route requests through `server.js` to avoid CORS |
-   | `VITE_GEOSERVER_WORKSPACE` | `your_workspace` | Production GeoServer workspace name |
-   | `VITE_GEOSERVER_LAYER_NAME` | `your_layer` | Production layer name |
-
-5. **Deploy**:
-   Click **Create Web Service** (or **Manual Deploy**). Render will build the app, launch `server.js`, and your map will be live!
+- **`src/config/mapConfig.js`**: Central map configuration, basemap endpoints, starting position, and query paging.
+- **`src/config/treeRendering.js`**: Multi-tier density thresholds (`DENSITY_THRESHOLDS`), GLB model paths, LOD tier mapping, foliage materials, and appearance colors.
+- **`src/config/geoserverConfig.js`**: Environment variable parsing, GeoServer target host, workspace, layer, and proxy settings.
+- **`src/data/treeData.js`**: WFS GeoJSON normalization, property projections, CQL filter generation, and species/health classification.
+- **`src/data/kmlLoader.js`**: Municipal KML parser for boundary coordinates and GeoJSON polygon generation.
+- **`src/map/createTreeLayer.js`**: Custom MapLibre Three.js 3D layer, GLTF model preparation, multi-tier instanced mesh management, and picking.
+- **`src/components/`**: Modular UI components including `InventorySidebar.jsx`, `MapModeControls.jsx`, `TreeColorLegend.jsx`, and `TreeDetailsPopup.jsx`.
 
 ---
 
-### 3. Alternative: Static Deployment (Vercel, Netlify, S3, Cloudflare Pages)
+## Reviewing Alternative Tree Models
 
-If you are hosting only static HTML/JS without a Node server:
-1. In your deployment environment variables, set:
-   ```env
-   VITE_GEOSERVER_TARGET_SERVER=https://your-geoserver.com
-   VITE_USE_PROXY=false
-   VITE_GEOSERVER_WORKSPACE=your_workspace
-   VITE_GEOSERVER_LAYER_NAME=your_layer
-   ```
-2. Build command: `npm run build`
-3. Publish directory: `dist`
-4. Make sure your remote GeoServer has CORS enabled (`Access-Control-Allow-Origin`).
-
-
-
-## Rendering
-
-- Map view uses OpenFreeMap Liberty, and Satellite switches on Esri World Imagery raster tiles.
-- Three.js is integrated through src/map/createTreeLayer.js, a custom MapLibre 3D layer.
-- Map/query settings are in src/config/mapConfig.js; tree models, health blending, LOD, and lighting are in src/config/treeRendering.js.
-- WFS normalization and CQL filtering live in src/data/treeData.js; reusable UI sections live in src/components/.
-- Four lightweight CC0 GLB tree forms (maple, oak, linden, palm) are normalized into local Z-up metres and instanced by material. At zoom 18.8+, compact Common Tree 1/2/4 and Palm Light assets replace the multi-MB detailed-leaf models; the detail tier is eligible for viewports with up to 2,000 visible trees. The zoomed-out model set and health tinting are unchanged.
-- Panning or zooming debounces the WFS query; a new request aborts any stale request.
-- UI displays the global count GeoServer reports, viewport match count, loaded count, and any viewport cap.
-
-## Development-only notes
-
-The synthetic dataset `public/data/trees-central-park-10000.json` and `scripts/generate_sample_trees.py` are preserved as fallback/test data but are no longer the active source. Temporary GeoServer inspection output belongs in `temp/geoserver-inspection/` and is git-ignored.
-
-Tree GLBs and source/license links are documented in `public/models/README.md`. Models are realistic visual proxies, not species-accurate representations of each census record. For production, configure a same-origin reverse proxy or server-side API to GeoServer, verify authentication/CORS and provider licensing, and tune paging or switch to vector tiles if the number of viewport matches is large.
-
-## Code organization and tuning
-
-- src/config/mapConfig.js centralizes map defaults, service endpoints, and WFS paging/debounce limits.
-- src/config/treeRendering.js centralizes tree model paths, LOD threshold/count, leaf material, health blend, lighting, renderer exposure, model scaling, and per-instance variation.
-- src/data/treeData.js owns WFS property projection, tree normalization/model selection, and CQL filter generation used by the MapLibre tree map.
-- src/map/createTreeLayer.js owns the Three.js custom MapLibre layer and model instancing.
-- src/components/ contains the inventory sidebar, map-mode controls, and selected-tree details panel.
-
-## Reviewing alternative tree models
-
-Start the development server and open `/tree-samples.html` to compare 16 tree models from low-poly geometric candidates to detailed, species-inspired assets side by side. The GLBs and source/license notes are in `public/models/samples/`; they are preview-only and do not replace the models used by the live map.
+Start the development server and open `/tree-samples.html` to compare 16 tree models from low-poly geometric candidates to detailed, species-inspired assets side by side. Model stats and licenses are documented in [`public/models/samples/README.md`](public/models/samples/README.md).

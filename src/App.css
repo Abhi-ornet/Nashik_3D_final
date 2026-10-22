@@ -112,6 +112,53 @@
   color: #f0f5f0;
 }
 
+.tier-status-banner {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 4px 0 2px;
+}
+
+.tier-badge {
+  display: inline-block;
+  padding: 4px 10px;
+  border-radius: 12px;
+  font: 600 11px Manrope, sans-serif;
+  letter-spacing: 0.3px;
+  text-align: center;
+  width: 100%;
+}
+
+.tier-detail {
+  background: rgba(79, 152, 99, 0.2);
+  color: #6ed188;
+  border: 1px solid rgba(79, 152, 99, 0.45);
+}
+
+.tier-mid {
+  background: rgba(86, 172, 230, 0.2);
+  color: #79c7ff;
+  border: 1px solid rgba(86, 172, 230, 0.45);
+}
+
+.tier-lowpoly {
+  background: rgba(235, 173, 62, 0.2);
+  color: #f5be58;
+  border: 1px solid rgba(235, 173, 62, 0.45);
+}
+
+.tier-2d {
+  background: rgba(189, 92, 82, 0.2);
+  color: #f08275;
+  border: 1px solid rgba(189, 92, 82, 0.45);
+}
+
+.tier-idle {
+  background: rgba(130, 144, 135, 0.15);
+  color: #9ab0a2;
+  border: 1px solid rgba(130, 144, 135, 0.3);
+}
+
 .filter-row-two-col {
   display: grid;
   grid-template-columns: 1fr 1fr;

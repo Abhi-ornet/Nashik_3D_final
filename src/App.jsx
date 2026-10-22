@@ -18,9 +18,11 @@ import {
   START_ZOOM,
   TREE_PICK_RADIUS_PX,
   WFS_URL,
+  GEOSERVER_CONFIG,
   getViewportRecordLimit,
 } from './config/mapConfig.js';
 import { DETAIL_PROPERTY_NAMES, getCqlFilter, normalizeTree, PROPERTY_NAMES } from './data/treeData.js';
+import { DENSITY_THRESHOLDS } from './config/treeRendering.js';
 import InventorySidebar from './components/InventorySidebar.jsx';
 import MapModeControls from './components/MapModeControls.jsx';
 import TreeColorLegend from './components/TreeColorLegend.jsx';
@@ -56,8 +58,8 @@ export default function App() {
       activeWs = `${citycode}treecensus`;
       activeLy = `${citycode}treecensus`;
     } else {
-      activeWs = 'nashiktreecensus';
-      activeLy = 'nashiktreecensus';
+      activeWs = GEOSERVER_CONFIG.workspace || 'nashiktreecensus';
+      activeLy = GEOSERVER_CONFIG.layerName || 'nashiktreecensus';
     }
     return { activeWorkspace: activeWs, activeLayer: activeLy };
   }, [ws, layer, citycode]);
@@ -78,6 +80,7 @@ export default function App() {
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const treeLayerRef = useRef(null);
+  const wardGeoJsonRef = useRef(null);
   const viewportTreesRef = useRef([]);
   const visibleTreesRef = useRef([]);
   const filtersRef = useRef({ health: 'all', species: 'all', enabled: true });
@@ -120,7 +123,7 @@ export default function App() {
     const bounds = map.getBounds();
     const filters = filtersRef.current;
     const cqlFilter = getCqlFilter(filters, bounds);
-    const maxRecords = getViewportRecordLimit(map.getZoom());
+    const maxRecords = DENSITY_THRESHOLDS.LOW_POLY;
 
     const buildUrl = (startIndex) => {
       const params = new URLSearchParams({
@@ -152,6 +155,24 @@ export default function App() {
       const knownMatched = Number.isFinite(matched) ? matched : firstPage.features.length;
       setMatchedInViewport(knownMatched);
 
+      // Tier 4: Over 10,000 trees in view -> Switch to 2D WMS raster tiles
+      if (knownMatched > DENSITY_THRESHOLDS.LOW_POLY) {
+        viewportTreesRef.current = [];
+        visibleTreesRef.current = [];
+        if (treeLayerRef.current) treeLayerRef.current.updateTrees([]);
+        setLoadedInViewport(0);
+        if (map.getLayer('wms-tree-2d-layer')) {
+          map.setLayoutProperty('wms-tree-2d-layer', 'visibility', 'visible');
+        }
+        setStatus(`2D Map View: ${knownMatched.toLocaleString()} trees in view (>10k limit). Zoom in for 3D.`);
+        return;
+      }
+
+      // 3D Tiers Active (<= 10,000 trees) -> Hide 2D WMS raster layer
+      if (map.getLayer('wms-tree-2d-layer')) {
+        map.setLayoutProperty('wms-tree-2d-layer', 'visibility', 'none');
+      }
+
       const toFetch = Math.min(knownMatched || firstPage.features.length, maxRecords);
       const pageOffsets = [];
       for (let start = PAGE_SIZE; start < toFetch; start += PAGE_SIZE) pageOffsets.push(start);
@@ -167,49 +188,97 @@ export default function App() {
       }));
       if (controller.signal.aborted) return;
 
-      const features = [firstPage.features, ...laterPages].flat();
+      const features = [firstPage.features, ...laterPages].flat().slice(0, maxRecords);
       const normalized = features.map(normalizeTree).filter(Boolean);
       viewportTreesRef.current = normalized;
       setLoadedInViewport(normalized.length);
       setSelectedTree((current) => current && normalized.some((tree) => tree.id === current.id) ? current : null);
       applyVisibleTrees();
       if (filtersRef.current.enabled && treeLayerRef.current) {
-        treeLayerRef.current.ensureDetailModels(visibleTreesRef.current.length);
+        treeLayerRef.current.ensureModels(visibleTreesRef.current.length);
       }
 
-      if (knownMatched > normalized.length) {
-        setStatus(`Loaded ${normalized.length.toLocaleString()} of ${knownMatched.toLocaleString()} matching trees; zoom in for more detail.`);
+      let tierName = '';
+      if (normalized.length <= DENSITY_THRESHOLDS.DETAIL) {
+        tierName = '3D Detailed View';
+      } else if (normalized.length <= DENSITY_THRESHOLDS.MID) {
+        tierName = '3D Mid View';
       } else {
-        setStatus(`Loaded all ${normalized.length.toLocaleString()} trees matching this viewport.`);
+        tierName = '3D Showcase Low-Poly View';
       }
+
+      setStatus(`${tierName}: Loaded all ${normalized.length.toLocaleString()} trees matching this viewport.`);
     } catch (error) {
       if (error.name === 'AbortError') return;
       viewportTreesRef.current = [];
       applyVisibleTrees();
       setMatchedInViewport(0);
       setLoadedInViewport(0);
+      if (map.getLayer('wms-tree-2d-layer')) {
+        map.setLayoutProperty('wms-tree-2d-layer', 'visibility', 'visible');
+      }
       setStatus(`GeoServer error: ${error.message}`);
     }
-  }, [applyVisibleTrees]);
+  }, [applyVisibleTrees, treeLayer]);
 
   fetchViewportRef.current = loadViewport;
 
   useEffect(() => {
-    if (!citycode) return;
-    loadCityKml(citycode).then((kmlData) => {
+    const targetCity = citycode || 'nashik';
+    loadCityKml(targetCity).then((kmlData) => {
       if (!kmlData) return;
-      if (treeLayerRef.current) {
-        treeLayerRef.current.updateBorders(kmlData.rings);
+      if (kmlData.geojson) {
+        wardGeoJsonRef.current = kmlData.geojson;
+        const applyWardBoundary = () => {
+          const m = mapRef.current;
+          if (!m || !m.isStyleLoaded() || !kmlData.geojson) return;
+          if (m.getSource('ward-boundary-source')) {
+            m.getSource('ward-boundary-source').setData(kmlData.geojson);
+          } else {
+            m.addSource('ward-boundary-source', {
+              type: 'geojson',
+              data: kmlData.geojson,
+            });
+            m.addLayer({
+              id: 'ward-boundary-fill',
+              type: 'fill',
+              source: 'ward-boundary-source',
+              paint: {
+                'fill-color': '#00e5ff',
+                'fill-opacity': 0.04,
+              },
+            });
+            m.addLayer({
+              id: 'ward-boundary-line',
+              type: 'line',
+              source: 'ward-boundary-source',
+              paint: {
+                'line-color': '#00e5ff',
+                'line-width': 2,
+                'line-opacity': 0.85,
+              },
+            });
+          }
+        };
+        if (mapRef.current && mapRef.current.isStyleLoaded()) {
+          applyWardBoundary();
+        } else if (mapRef.current) {
+          mapRef.current.once('load', applyWardBoundary);
+        }
       }
       if (!lat || !long) {
-        if (mapRef.current) {
-          mapRef.current.flyTo({
-            center: kmlData.center,
-            zoom: START_ZOOM,
-            pitch: INITIAL_PITCH,
-            essential: true,
+        const sampleUrl = `${WFS_URL}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${treeLayer}&count=1&outputFormat=application/json&srsName=CRS:84`;
+        fetch(sampleUrl)
+          .then((r) => (r.ok ? r.json() : null))
+          .then((s) => {
+            const c = s?.features?.[0]?.geometry?.coordinates;
+            const target = c && c.length >= 2 ? [c[0], c[1]] : kmlData.center;
+            if (mapRef.current) mapRef.current.flyTo({ center: target, zoom: START_ZOOM, pitch: INITIAL_PITCH, essential: true });
+          })
+          .catch(() => {
+            if (mapRef.current) mapRef.current.flyTo({ center: kmlData.center, zoom: START_ZOOM, pitch: INITIAL_PITCH, essential: true });
           });
-        }
+        return;
       }
     });
   }, [citycode, lat, long]);
@@ -283,9 +352,59 @@ export default function App() {
         paint: { 'raster-fade-duration': 180 },
       }, firstTextLayer ? firstTextLayer.id : undefined);
 
+      const serverBase = GEOSERVER_CONFIG.useProxy ? '' : (GEOSERVER_CONFIG.targetServer || '').replace(/\/+$/, '');
+      const wmsUrl = `${serverBase}/geoserver/${activeWorkspace}/wms?` +
+        'REQUEST=GetMap&SERVICE=WMS&VERSION=1.1.0&FORMAT=image/png&' +
+        'STYLES=treeimg&TRANSPARENT=true&' +
+        `LAYERS=${treeLayer}&TILED=true&FORMAT_OPTIONS=dpi:113&` +
+        'WIDTH=256&HEIGHT=256&SRS=EPSG:3857&BBOX={bbox-epsg-3857}';
+
+      map.addSource('wms-tree-2d-source', {
+        type: 'raster',
+        tiles: [wmsUrl],
+        tileSize: 256,
+      });
+
+      map.addLayer({
+        id: 'wms-tree-2d-layer',
+        type: 'raster',
+        source: 'wms-tree-2d-source',
+        layout: { visibility: 'none' },
+        paint: {
+          'raster-opacity': 0.9,
+          'raster-fade-duration': 150,
+        },
+      }, firstTextLayer ? firstTextLayer.id : undefined);
+
       const layer = createTreeLayer(initialCenter);
       treeLayerRef.current = layer;
       map.addLayer(layer, firstTextLayer ? firstTextLayer.id : undefined);
+
+      if (wardGeoJsonRef.current && !map.getSource('ward-boundary-source')) {
+        map.addSource('ward-boundary-source', {
+          type: 'geojson',
+          data: wardGeoJsonRef.current,
+        });
+        map.addLayer({
+          id: 'ward-boundary-fill',
+          type: 'fill',
+          source: 'ward-boundary-source',
+          paint: {
+            'fill-color': '#00ffff',
+            'fill-opacity': 0.08,
+          },
+        });
+        map.addLayer({
+          id: 'ward-boundary-line',
+          type: 'line',
+          source: 'ward-boundary-source',
+          paint: {
+            'line-color': '#00ffff',
+            'line-width': 2.5,
+            'line-opacity': 0.95,
+          },
+        });
+      }
 
       moveEndHandler = () => {
         clearTimeout(moveTimer);

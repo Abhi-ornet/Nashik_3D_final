@@ -20,6 +20,19 @@ export const TREE_APPEARANCE_COLORS = {
 
 export const TREE_CUT_MODEL = '/models/tree-cut.glb';
 
+// Density thresholds for multi-tier level of detail (purely count-based, not zoom-based)
+export const DENSITY_THRESHOLDS = {
+  DETAIL: 5000,
+  MID: 7500,
+  LOW_POLY: 30000,
+};
+
+// Tier 3 (Showcase Low-Poly 3D: 7,501 - 16,000 trees)
+export const TREE_LOW_POLY_MODELS = {
+  pine: '/models/samples/innerscene-conical-pine.glb',
+  fir: '/models/samples/innerscene-layered-fir.glb',
+};
+
 export const TREE_MODELS = {
   maple: '/models/maple-street-tree.glb',
   oak: '/models/oak-street-tree.glb',
@@ -40,8 +53,8 @@ export const TREE_DETAIL_MODELS = {
 
 // These models are around 4k–7k triangles per broadleaf tree; Palm Light is ~34k.
 // Instancing lets the detail tier cover larger viewports without loading huge tree meshes.
-export const DETAIL_ZOOM = 15.8;
-export const DETAIL_MAX_TREES = 5000;
+export const DETAIL_ZOOM = 0; // Deprecated: Tiers are now purely tree-count based
+export const DETAIL_MAX_TREES = DENSITY_THRESHOLDS.DETAIL;
 
 export const FOLIAGE_MATERIAL = {
   roughness: 0.92,

@@ -16,16 +16,17 @@ export const MAX_PITCH = 65;
 export const MIN_ZOOM = 11;
 
 export const PAGE_SIZE = 1500;
+export const MAX_3D_RECORDS = 10000;
 export const VIEWPORT_RECORD_CAPS = [
-  { minZoom: 18.5, maxRecords: 12000 },
-  { minZoom: 0, maxRecords: 7000 },
+  { minZoom: 0, maxRecords: 10000 },
+
 ];
 
 export const MOVE_QUERY_DEBOUNCE_MS = 220;
 export const TREE_PICK_RADIUS_PX = 18;
 
 export function getViewportRecordLimit(zoom) {
-  return VIEWPORT_RECORD_CAPS.find((limit) => zoom >= limit.minZoom)?.maxRecords ?? 1500;
+  return MAX_3D_RECORDS;
 }
 
 

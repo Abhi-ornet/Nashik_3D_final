@@ -5,6 +5,7 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 
 import { START_CENTER } from '../config/mapConfig.js';
 import {
+  DENSITY_THRESHOLDS,
   DETAIL_MAX_TREES,
   DETAIL_ZOOM,
   FOLIAGE_MATERIAL,
@@ -14,6 +15,7 @@ import {
   TREE_DETAIL_MODELS,
   TREE_INSTANCE_VARIATION,
   TREE_LIGHTING,
+  TREE_LOW_POLY_MODELS,
   TREE_MODELS,
   TREE_MODEL_HEIGHT_LIMITS,
   TREE_RENDERER,
@@ -33,6 +35,8 @@ export function createTreeLayer(initialCenter = START_CENTER) {
   let detailedModelsReady = false;
   let detailedModelsRequested = false;
   let treeCutModelReady = false;
+  let lowPolyModelsReady = false;
+  let lowPolyModelsRequested = false;
   let removed = false;
   const preparedModels = new Map();
   const realModelInstances = [];
@@ -150,8 +154,11 @@ export function createTreeLayer(initialCenter = START_CENTER) {
   }
 
   function buildRealModelInstances(trees) {
+    const isLowPolyTier = Boolean(
+      trees.length > DENSITY_THRESHOLDS.MID && trees.length <= DENSITY_THRESHOLDS.LOW_POLY && lowPolyModelsReady,
+    );
     const wantsDetailed = Boolean(
-      map && map.getZoom() >= DETAIL_ZOOM && detailedModelsReady && trees.length <= DETAIL_MAX_TREES,
+      !isLowPolyTier && detailedModelsReady && trees.length <= DENSITY_THRESHOLDS.DETAIL,
     );
     const buckets = new Map();
     // Scale stumps relative to the average recorded height of trees currently visible.
@@ -163,6 +170,13 @@ export function createTreeLayer(initialCenter = START_CENTER) {
       : 8;
     const stumpHeightMeters = Math.max(2.5, Math.min(4.5, averageTreeHeight * 0.32));
     trees.forEach((tree) => {
+      if (isLowPolyTier) {
+        const seed = String(tree.uid || tree.id).split('').reduce((sum, char) => sum + char.charCodeAt(0), 0);
+        const key = seed % 2 === 0 ? 'fir' : 'pine';
+        if (!buckets.has(key)) buckets.set(key, []);
+        buckets.get(key).push(tree);
+        return;
+      }
       // Recognize values such as Dead, Mechanically Cut, TreeCut, Cut Tree, and Uprooted.
       const condition = String(tree.healthCondition || tree.healthLabel || '').trim().toLowerCase();
       const normalizedCondition = condition.replace(/[^a-z]/g, '');
@@ -172,8 +186,7 @@ export function createTreeLayer(initialCenter = START_CENTER) {
         buckets.get('treecut').push(tree);
         return;
       }
-      // Local palm aliases are reclassified only in detail zoom. The original
-      // chooseTreeModel behavior, and therefore the zoomed-out tier, stays unchanged.
+      // Local palm aliases are reclassified only in detail tier.
       const localName = String(tree.localName || '').trim().toLowerCase().replace(/\s+/g, ' ');
       const isPalmAlias = /\bpalm\b|coconut|areca|date\s+palm|\bnaral\b|\bnarikel\b|\bsupari\b|\bkhajur\b/.test(localName);
       const key = wantsDetailed && isPalmAlias ? 'palm' : chooseTreeModel(tree);
@@ -182,8 +195,11 @@ export function createTreeLayer(initialCenter = START_CENTER) {
     });
 
     for (const [key, modelTrees] of buckets) {
-      const model = preparedModels.get(wantsDetailed ? key + ':detailed' : key) || preparedModels.get(key);
-      if (!model) throw new Error('Tree model not loaded: ' + key);
+      const modelKey = isLowPolyTier
+        ? key + ':lowpoly'
+        : (wantsDetailed ? key + ':detailed' : key);
+      const model = preparedModels.get(modelKey) || preparedModels.get(key);
+      if (!model) throw new Error('Tree model not loaded: ' + modelKey);
 
       model.parts.forEach((part) => {
         const instances = new THREE.InstancedMesh(part.geometry, part.material, modelTrees.length);
@@ -308,7 +324,26 @@ export function createTreeLayer(initialCenter = START_CENTER) {
         console.warn('Detailed tree LOD could not fully load; keeping lightweight tree models.');
         disposePreparedModels((key) => key.endsWith(':detailed'));
       } else {
-        // Use detailed leaves only if the camera is still zoomed in close.
+        rebuild(visibleTrees);
+        if (map) map.triggerRepaint();
+      }
+    });
+  }
+
+  function loadLowPolyTreeModels() {
+    if (lowPolyModelsRequested || removed) return;
+    lowPolyModelsRequested = true;
+    loadModelSet(TREE_LOW_POLY_MODELS, ':lowpoly').then((results) => {
+      if (removed) {
+        disposePreparedModels((key) => key.endsWith(':lowpoly'));
+        return;
+      }
+      lowPolyModelsReady = results.every(Boolean) &&
+        Object.keys(TREE_LOW_POLY_MODELS).every((key) => preparedModels.has(key + ':lowpoly'));
+      if (!lowPolyModelsReady) {
+        console.warn('Low-poly tree models could not fully load; falling back to base models.');
+        disposePreparedModels((key) => key.endsWith(':lowpoly'));
+      } else {
         rebuild(visibleTrees);
         if (map) map.triggerRepaint();
       }
@@ -467,7 +502,7 @@ export function createTreeLayer(initialCenter = START_CENTER) {
   function updateBorders(rings) {
     pendingBorderRings = rings;
     if (scene && sceneOrigin) {
-      renderBorders(rings);
+      // 2D vector layer in MapLibre handles boundary rendering
     }
   }
 
@@ -515,7 +550,8 @@ export function createTreeLayer(initialCenter = START_CENTER) {
       renderer.toneMappingExposure = TREE_RENDERER.toneMappingExposure;
       loadTreeModels();
       loadTreeCutModel();
-      if (pendingBorderRings) renderBorders(pendingBorderRings);
+      loadLowPolyTreeModels();
+
     },
 
     render(_gl, args) {
@@ -537,15 +573,16 @@ export function createTreeLayer(initialCenter = START_CENTER) {
       if (map) map.triggerRepaint();
     },
 
-    ensureDetailModels(treeCount = visibleTrees.length) {
-      if (
-        map &&
-        map.getZoom() >= DETAIL_ZOOM &&
-        treeCount > 0 &&
-        treeCount <= DETAIL_MAX_TREES
-      ) {
+    ensureModels(treeCount = visibleTrees.length) {
+      if (treeCount > 0 && treeCount <= DENSITY_THRESHOLDS.DETAIL) {
         loadDetailedTreeModels();
+      } else if (treeCount > DENSITY_THRESHOLDS.MID && treeCount <= DENSITY_THRESHOLDS.LOW_POLY) {
+        loadLowPolyTreeModels();
       }
+    },
+
+    ensureDetailModels(treeCount = visibleTrees.length) {
+      this.ensureModels(treeCount);
     },
 
     setSelected(id) {
