@@ -255,7 +255,7 @@ export default function App() {
         // A failed global-count request should not overwrite the status of a working viewport query.
         if (!disposed && error.name !== 'AbortError') console.warn('GeoServer global count unavailable:', error);
       });
-    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'top-right');
+    map.addControl(new maplibregl.NavigationControl({ visualizePitch: true }), 'bottom-right');
     map.addControl(new maplibregl.ScaleControl({ unit: 'metric' }), 'bottom-left');
 
     map.on('load', () => {
@@ -358,7 +358,7 @@ export default function App() {
   return (
     <main className="app-shell">
       <InventorySidebar
-        status={status}
+
         totalTrees={totalTrees}
         matchedInViewport={matchedInViewport}
         loadedInViewport={loadedInViewport}
@@ -366,9 +366,9 @@ export default function App() {
         setSpeciesFilter={setSpeciesFilter}
         healthFilter={healthFilter}
         setHealthFilter={setHealthFilter}
-        treesEnabled={treesEnabled}
-        setTreesEnabled={setTreesEnabled}
-        treeLayer={treeLayer}
+
+
+
       />
 
       <section className="map-panel">
