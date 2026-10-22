@@ -19,7 +19,6 @@ import {
   TREE_PICK_RADIUS_PX,
   WFS_URL,
   GEOSERVER_CONFIG,
-  getViewportRecordLimit,
 } from './config/mapConfig.js';
 import { DETAIL_PROPERTY_NAMES, getCqlFilter, normalizeTree, PROPERTY_NAMES } from './data/treeData.js';
 import { DENSITY_THRESHOLDS } from './config/treeRendering.js';
@@ -27,6 +26,7 @@ import InventorySidebar from './components/InventorySidebar.jsx';
 import MapModeControls from './components/MapModeControls.jsx';
 import TreeColorLegend from './components/TreeColorLegend.jsx';
 import TreeDetailsPopup from './components/TreeDetailsPopup.jsx';
+import TreeSearchBar from './components/TreeSearchBar.jsx';
 
 export default function App() {
   const searchParams = useMemo(() => {
@@ -41,6 +41,10 @@ export default function App() {
   const layer = searchParams.get('layer')?.trim();
   const lat = searchParams.get('lat');
   const long = searchParams.get('long');
+
+  const targetUid = searchParams.get('uid')?.trim() || searchParams.get('treeid')?.trim();
+
+
 
   const { activeWorkspace, activeLayer } = useMemo(() => {
     let activeWs = '';
@@ -87,6 +91,8 @@ export default function App() {
   const fetchViewportRef = useRef(() => {});
   const activeRequestRef = useRef(null);
   const detailsRequestRef = useRef(null);
+  const fetchTreeDetailsRef = useRef(() => {});
+  const pendingFocusTreeRef = useRef(null);
 
   const [status, setStatus] = useState('Connecting to GeoServer…');
   const [totalTrees, setTotalTrees] = useState(0);
@@ -141,21 +147,28 @@ export default function App() {
       return WFS_URL + '?' + params.toString();
     };
 
-    setStatus('Querying trees in the current viewport…');
+    setStatus('Checking trees in the current viewport…');
     try {
-      const firstResponse = await fetch(buildUrl(0), { signal: controller.signal });
-      if (!firstResponse.ok) throw new Error(`GeoServer returned HTTP ${firstResponse.status}`);
-      const firstPage = await firstResponse.json();
-      if (firstPage.type !== 'FeatureCollection' || !Array.isArray(firstPage.features)) {
-        throw new Error('GeoServer did not return a GeoJSON FeatureCollection');
-      }
+      // 1. Lightweight hits query (returns ~800 bytes without transferring tree geometries)
+      const countParams = new URLSearchParams({
+        service: 'WFS',
+        version: '2.0.0',
+        request: 'GetFeature',
+        typeNames: treeLayer,
+        resultType: 'hits',
+      });
+      countParams.set('CQL_FILTER', cqlFilter);
+
+      const hitsResponse = await fetch(WFS_URL + '?' + countParams.toString(), { signal: controller.signal });
+      if (!hitsResponse.ok) throw new Error(`GeoServer returned HTTP ${hitsResponse.status}`);
+      const hitsXml = await hitsResponse.text();
       if (controller.signal.aborted) return;
 
-      const matched = Number(firstPage.numberMatched ?? firstPage.totalFeatures ?? firstPage.features.length);
-      const knownMatched = Number.isFinite(matched) ? matched : firstPage.features.length;
+      const match = hitsXml.match(/numberMatched="([0-9]+)"/);
+      const knownMatched = match ? Number(match[1]) : 0;
       setMatchedInViewport(knownMatched);
 
-      // Tier 4: Over 10,000 trees in view -> Switch to 2D WMS raster tiles
+      // Tier 4: Over 16,000 trees in view -> Switch to 2D WMS raster tiles immediately
       if (knownMatched > DENSITY_THRESHOLDS.LOW_POLY) {
         viewportTreesRef.current = [];
         visibleTreesRef.current = [];
@@ -164,20 +177,32 @@ export default function App() {
         if (map.getLayer('wms-tree-2d-layer')) {
           map.setLayoutProperty('wms-tree-2d-layer', 'visibility', 'visible');
         }
-        setStatus(`2D Map View: ${knownMatched.toLocaleString()} trees in view (>10k limit). Zoom in for 3D.`);
+        setStatus(`2D Map View: ${knownMatched.toLocaleString()} trees in view (>16k limit). Zoom in for 3D.`);
         return;
       }
 
-      // 3D Tiers Active (<= 10,000 trees) -> Hide 2D WMS raster layer
+      // 3D Tiers Active (<= 16,000 trees) -> Hide 2D WMS raster layer
       if (map.getLayer('wms-tree-2d-layer')) {
         map.setLayoutProperty('wms-tree-2d-layer', 'visibility', 'none');
       }
 
-      const toFetch = Math.min(knownMatched || firstPage.features.length, maxRecords);
-      const pageOffsets = [];
-      for (let start = PAGE_SIZE; start < toFetch; start += PAGE_SIZE) pageOffsets.push(start);
+      if (knownMatched === 0) {
+        viewportTreesRef.current = [];
+        visibleTreesRef.current = [];
+        if (treeLayerRef.current) treeLayerRef.current.updateTrees([]);
+        setLoadedInViewport(0);
+        setStatus('No trees in this viewport.');
+        return;
+      }
 
-      const laterPages = await Promise.all(pageOffsets.map(async (startIndex) => {
+      setStatus(`Loading ${knownMatched.toLocaleString()} trees in 3D…`);
+
+      // 2. Fetch pages in parallel for 3D rendering
+      const toFetch = Math.min(knownMatched, maxRecords);
+      const pageOffsets = [];
+      for (let start = 0; start < toFetch; start += PAGE_SIZE) pageOffsets.push(start);
+
+      const pages = await Promise.all(pageOffsets.map(async (startIndex) => {
         const response = await fetch(buildUrl(startIndex), { signal: controller.signal });
         if (!response.ok) throw new Error(`GeoServer returned HTTP ${response.status}`);
         const page = await response.json();
@@ -188,7 +213,7 @@ export default function App() {
       }));
       if (controller.signal.aborted) return;
 
-      const features = [firstPage.features, ...laterPages].flat().slice(0, maxRecords);
+      const features = pages.flat().slice(0, maxRecords);
       const normalized = features.map(normalizeTree).filter(Boolean);
       viewportTreesRef.current = normalized;
       setLoadedInViewport(normalized.length);
@@ -424,9 +449,15 @@ export default function App() {
         }
         setSelectedTree(nearest);
         if (treeLayerRef.current) treeLayerRef.current.setSelected(nearest ? nearest.id : null);
+        if (nearest && fetchTreeDetailsRef.current) fetchTreeDetailsRef.current(nearest);
       };
       map.on('moveend', moveEndHandler);
       map.on('click', clickHandler);
+      if (pendingFocusTreeRef.current) {
+        const pt = pendingFocusTreeRef.current;
+        pendingFocusTreeRef.current = null;
+        map.flyTo({ center: [pt.x, pt.y], zoom: 19, pitch: FOCUS_PITCH, duration: 850 });
+      }
       fetchViewportRef.current();
     });
 
@@ -434,6 +465,7 @@ export default function App() {
       disposed = true;
       clearTimeout(moveTimer);
       if (activeRequestRef.current) activeRequestRef.current.abort();
+      if (detailsRequestRef.current) detailsRequestRef.current.abort();
       countController.abort();
       if (moveEndHandler) map.off('moveend', moveEndHandler);
       if (clickHandler) map.off('click', clickHandler);
@@ -454,14 +486,66 @@ export default function App() {
     applyVisibleTrees();
   }, [treesEnabled, applyVisibleTrees]);
 
-  const focusTree = (tree) => {
+  const fetchTreeDetails = useCallback(async (tree) => {
+    if (!tree) return;
+    if (detailsRequestRef.current) detailsRequestRef.current.abort();
+    const controller = new AbortController();
+    detailsRequestRef.current = controller;
+
+    try {
+      const cql = tree.uid
+        ? `Tree_UID = '${tree.uid.replace(/'/g, "''")}'`
+        : `id = '${tree.id.replace(/'/g, "''")}'`;
+      const url = `${WFS_URL}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${encodeURIComponent(treeLayer)}&count=1&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(cql)}`;
+
+      const res = await fetch(url, { signal: controller.signal });
+      if (!res.ok) return;
+      const json = await res.json();
+      if (controller.signal.aborted) return;
+      if (json.features && json.features.length > 0) {
+        const fullTree = normalizeTree(json.features[0]);
+        if (fullTree) {
+          setSelectedTree((current) => (current && (current.id === tree.id || current.uid === tree.uid)) ? { ...current, ...fullTree } : current);
+        }
+      }
+    } catch (e) {
+      if (e.name !== 'AbortError') console.warn('Could not load tree details:', e);
+    }
+  }, [treeLayer]);
+
+  fetchTreeDetailsRef.current = fetchTreeDetails;
+
+  const focusTree = useCallback((tree) => {
     if (!tree) return;
     if (mapRef.current) {
       mapRef.current.flyTo({ center: [tree.x, tree.y], zoom: 19, pitch: FOCUS_PITCH, duration: 850 });
+    } else {
+      pendingFocusTreeRef.current = tree;
     }
     setSelectedTree(tree);
     if (treeLayerRef.current) treeLayerRef.current.setSelected(tree.id);
-  };
+    fetchTreeDetails(tree);
+  }, [fetchTreeDetails]);
+
+  // Handle direct tree deep-linking (?uid=... or ?treeid=...)
+  useEffect(() => {
+    if (!targetUid) return;
+    const clean = targetUid.replace(/'/g, "''");
+    const isDigits = /^\d+$/.test(targetUid);
+    const cql = isDigits
+      ? `TreeCensusCd = ${clean}`
+      : `Tree_UID = '${clean}'`;
+    const url = `${WFS_URL}?service=WFS&version=2.0.0&request=GetFeature&typeNames=${encodeURIComponent(treeLayer)}&count=1&outputFormat=application/json&CQL_FILTER=${encodeURIComponent(cql)}`;
+    fetch(url)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((json) => {
+        if (json?.features?.length > 0) {
+          const tree = normalizeTree(json.features[0]);
+          if (tree) focusTree(tree);
+        }
+      })
+      .catch((err) => console.warn('Direct tree URL query failed:', err));
+  }, [targetUid, treeLayer, focusTree]);
 
   const setView = (mode) => {
     viewModeRef.current = mode;
@@ -492,6 +576,7 @@ export default function App() {
 
       <section className="map-panel">
         <div ref={mapElementRef} className="map-container" />
+        <TreeSearchBar onSelectTree={focusTree} treeLayer={treeLayer} wfsUrl={WFS_URL} />
         <div className="map-top-chip"><span className="chip-dot" /> {(citycode || activeWorkspace).toUpperCase()} <span className="chip-divider">/</span> TREE CENSUS</div>
         <MapModeControls viewMode={viewMode} onChange={setView} />
         <TreeColorLegend />

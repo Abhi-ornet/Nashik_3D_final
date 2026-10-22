@@ -98,6 +98,7 @@ export function normalizeTree(feature) {
     iucnStatus: properties.IUCN_Status || 'Not recorded',
     photo: properties.TreePhoto || null,
     icon: properties.Icon || null,
+    rawProperties: properties,
   };
 }
 

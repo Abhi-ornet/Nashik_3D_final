@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { DENSITY_THRESHOLDS } from '../config/treeRendering.js';
 
 export default function InventorySidebar({
   totalTrees,
@@ -47,15 +48,15 @@ export default function InventorySidebar({
 
           <div className="tier-status-banner">
             {loadedInViewport > 0 ? (
-              loadedInViewport <= 5000 ? (
-                <span className="tier-badge tier-detail">● Tier 1: Detailed 3D (≤5k)</span>
-              ) : loadedInViewport <= 7500 ? (
-                <span className="tier-badge tier-mid">● Tier 2: Mid 3D (≤7.5k)</span>
+              loadedInViewport <= DENSITY_THRESHOLDS.DETAIL ? (
+                <span className="tier-badge tier-detail">● Tier 1: Detailed 3D (≤{(DENSITY_THRESHOLDS.DETAIL / 1000).toFixed(0)}k)</span>
+              ) : loadedInViewport <= DENSITY_THRESHOLDS.MID ? (
+                <span className="tier-badge tier-mid">● Tier 2: Mid 3D (≤{(DENSITY_THRESHOLDS.MID / 1000).toFixed(1)}k)</span>
               ) : (
-                <span className="tier-badge tier-lowpoly">● Tier 3: Showcase Low-Poly (≤10k)</span>
+                <span className="tier-badge tier-lowpoly">● Tier 3: Showcase Low-Poly (≤{(DENSITY_THRESHOLDS.LOW_POLY / 1000).toFixed(0)}k)</span>
               )
-            ) : matchedInViewport > 10000 ? (
-              <span className="tier-badge tier-2d">● Tier 4: 2D WMS Map (&gt;10k)</span>
+            ) : matchedInViewport > DENSITY_THRESHOLDS.LOW_POLY ? (
+              <span className="tier-badge tier-2d">● Tier 4: 2D WMS Map (&gt;{(DENSITY_THRESHOLDS.LOW_POLY / 1000).toFixed(0)}k)</span>
             ) : (
               <span className="tier-badge tier-idle">● Standby</span>
             )}
