@@ -20,7 +20,9 @@ import {
 } from '../config/treeRendering.js';
 import { chooseTreeModel, getTreeAppearance } from '../data/treeData.js';
 
-export function createTreeLayer() {
+export function createTreeLayer(initialCenter = START_CENTER) {
+  let borderGroup = null;
+  let pendingBorderRings = null;
   let map, renderer, scene, camera;
   let trunkGeometry, crownGeometry, trunkMaterial, crownMaterial;
   let trunkInstances, lowerCrownInstances, middleCrownInstances, topCrownInstances;
@@ -418,6 +420,57 @@ export function createTreeLayer() {
     updateSelection();
   }
 
+
+  function clearBorders() {
+    if (!borderGroup || !scene) return;
+    scene.remove(borderGroup);
+    borderGroup.traverse((obj) => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) obj.material.dispose();
+    });
+    borderGroup = null;
+  }
+
+  function renderBorders(rings) {
+    if (!scene || !sceneOrigin) return;
+    clearBorders();
+    if (!rings || rings.length === 0) return;
+
+    borderGroup = new THREE.Group();
+    const borderMaterial = new THREE.LineBasicMaterial({
+      color: 0x00f0ff,
+      linewidth: 3,
+      transparent: true,
+      opacity: 0.9,
+    });
+
+    for (const ring of rings) {
+      if (!ring || ring.length < 2) continue;
+      const positions = [];
+      for (let i = 0; i < ring.length; i++) {
+        const [lng, lat] = ring[i];
+        const point = maplibregl.MercatorCoordinate.fromLngLat([lng, lat], 0);
+        const x = (point.x - sceneOrigin.x) / metersToMercator;
+        const y = (sceneOrigin.y - point.y) / metersToMercator;
+        positions.push(x, y, 3.0);
+      }
+      const geometry = new THREE.BufferGeometry();
+      geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+      const line = new THREE.LineLoop(geometry, borderMaterial);
+      borderGroup.add(line);
+    }
+
+    scene.add(borderGroup);
+    if (map) map.triggerRepaint();
+  }
+
+  function updateBorders(rings) {
+    pendingBorderRings = rings;
+    if (scene && sceneOrigin) {
+      renderBorders(rings);
+    }
+  }
+
   return {
     id: 'tree-models-3d',
     type: 'custom',
@@ -427,7 +480,7 @@ export function createTreeLayer() {
       map = mapInstance;
       scene = new THREE.Scene();
       camera = new THREE.Camera();
-      sceneOrigin = maplibregl.MercatorCoordinate.fromLngLat(START_CENTER, 0);
+      sceneOrigin = maplibregl.MercatorCoordinate.fromLngLat(initialCenter, 0);
       metersToMercator = sceneOrigin.meterInMercatorCoordinateUnits();
       localToMercator = new THREE.Matrix4()
         .makeTranslation(sceneOrigin.x, sceneOrigin.y, sceneOrigin.z)
@@ -462,6 +515,7 @@ export function createTreeLayer() {
       renderer.toneMappingExposure = TREE_RENDERER.toneMappingExposure;
       loadTreeModels();
       loadTreeCutModel();
+      if (pendingBorderRings) renderBorders(pendingBorderRings);
     },
 
     render(_gl, args) {
@@ -472,6 +526,10 @@ export function createTreeLayer() {
       camera.projectionMatrixInverse.copy(camera.projectionMatrix).invert();
       renderer.resetState();
       renderer.render(scene, camera);
+    },
+
+    updateBorders(rings) {
+      updateBorders(rings);
     },
 
     updateTrees(trees) {
@@ -506,6 +564,7 @@ export function createTreeLayer() {
       if (trunkMaterial) trunkMaterial.dispose();
       if (crownMaterial) crownMaterial.dispose();
       clearSelectionMarker();
+      clearBorders();
     },
   };
 }

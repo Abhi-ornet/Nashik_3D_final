@@ -10,7 +10,7 @@ const getEnv = (key, fallback = '') => {
   return fallback;
 };
 
-const targetServer = getEnv('VITE_GEOSERVER_TARGET_SERVER', 'http://127.0.0.1:8081');
+const targetServer = getEnv('VITE_GEOSERVER_TARGET_SERVER', 'https://www.ornettreecensus.com');
 
 const envUseProxy = getEnv('VITE_USE_PROXY');
 const useProxy = envUseProxy !== ''

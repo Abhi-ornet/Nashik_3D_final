@@ -1,7 +1,8 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 
 import { createTreeLayer } from './map/createTreeLayer.js';
+import { loadCityKml } from './data/kmlLoader.js';
 import {
   BASEMAP_STYLE_URL,
   FOCUS_PITCH,
@@ -15,7 +16,6 @@ import {
   SATELLITE_TILE_URL,
   START_CENTER,
   START_ZOOM,
-  TREE_LAYER,
   TREE_PICK_RADIUS_PX,
   WFS_URL,
   getViewportRecordLimit,
@@ -27,6 +27,54 @@ import TreeColorLegend from './components/TreeColorLegend.jsx';
 import TreeDetailsPopup from './components/TreeDetailsPopup.jsx';
 
 export default function App() {
+  const searchParams = useMemo(() => {
+    if (typeof window !== 'undefined' && window.location) {
+      return new URLSearchParams(window.location.search);
+    }
+    return new URLSearchParams();
+  }, []);
+
+  const citycode = searchParams.get('citycode')?.trim().toLowerCase();
+  const ws = searchParams.get('workspace')?.trim();
+  const layer = searchParams.get('layer')?.trim();
+  const lat = searchParams.get('lat');
+  const long = searchParams.get('long');
+
+  const { activeWorkspace, activeLayer } = useMemo(() => {
+    let activeWs = '';
+    let activeLy = '';
+    if (ws && layer) {
+      activeWs = ws;
+      activeLy = layer;
+    } else if (ws) {
+      activeWs = ws;
+      activeLy = ws;
+    } else if (layer) {
+      activeWs = layer;
+      activeLy = layer;
+    } else if (citycode) {
+      activeWs = `${citycode}treecensus`;
+      activeLy = `${citycode}treecensus`;
+    } else {
+      activeWs = 'nashiktreecensus';
+      activeLy = 'nashiktreecensus';
+    }
+    return { activeWorkspace: activeWs, activeLayer: activeLy };
+  }, [ws, layer, citycode]);
+
+  const treeLayer = `${activeWorkspace}:${activeLayer}`;
+
+  const initialCenter = useMemo(() => {
+    if (lat && long) {
+      const parsedLat = parseFloat(lat);
+      const parsedLong = parseFloat(long);
+      if (!Number.isNaN(parsedLat) && !Number.isNaN(parsedLong)) {
+        return [parsedLong, parsedLat];
+      }
+    }
+    return START_CENTER;
+  }, [lat, long]);
+
   const mapElementRef = useRef(null);
   const mapRef = useRef(null);
   const treeLayerRef = useRef(null);
@@ -79,7 +127,7 @@ export default function App() {
         service: 'WFS',
         version: '2.0.0',
         request: 'GetFeature',
-        typeNames: TREE_LAYER,
+        typeNames: treeLayer,
         outputFormat: 'application/json',
         srsName: 'CRS:84',
         count: String(PAGE_SIZE),
@@ -147,6 +195,27 @@ export default function App() {
   fetchViewportRef.current = loadViewport;
 
   useEffect(() => {
+    if (!citycode) return;
+    loadCityKml(citycode).then((kmlData) => {
+      if (!kmlData) return;
+      if (treeLayerRef.current) {
+        treeLayerRef.current.updateBorders(kmlData.rings);
+      }
+      if (!lat || !long) {
+        if (mapRef.current) {
+          mapRef.current.flyTo({
+            center: kmlData.center,
+            zoom: START_ZOOM,
+            pitch: INITIAL_PITCH,
+            essential: true,
+          });
+        }
+      }
+    });
+  }, [citycode, lat, long]);
+
+
+  useEffect(() => {
     let disposed = false;
     let moveTimer;
     let moveEndHandler;
@@ -155,7 +224,7 @@ export default function App() {
     const map = new maplibregl.Map({
       container: mapElementRef.current,
       style: BASEMAP_STYLE_URL,
-      center: START_CENTER,
+      center: initialCenter,
       zoom: START_ZOOM,
       pitch: INITIAL_PITCH,
       bearing: 0,
@@ -169,7 +238,7 @@ export default function App() {
       service: 'WFS',
       version: '2.0.0',
       request: 'GetFeature',
-      typeNames: TREE_LAYER,
+      typeNames: treeLayer,
       resultType: 'hits',
     });
     fetch(WFS_URL + '?' + countParams.toString(), { signal: countController.signal })
@@ -214,7 +283,7 @@ export default function App() {
         paint: { 'raster-fade-duration': 180 },
       }, firstTextLayer ? firstTextLayer.id : undefined);
 
-      const layer = createTreeLayer();
+      const layer = createTreeLayer(initialCenter);
       treeLayerRef.current = layer;
       map.addLayer(layer, firstTextLayer ? firstTextLayer.id : undefined);
 
@@ -299,11 +368,12 @@ export default function App() {
         setHealthFilter={setHealthFilter}
         treesEnabled={treesEnabled}
         setTreesEnabled={setTreesEnabled}
+        treeLayer={treeLayer}
       />
 
       <section className="map-panel">
         <div ref={mapElementRef} className="map-container" />
-        <div className="map-top-chip"><span className="chip-dot" /> NASHIK <span className="chip-divider">/</span> MAHARASHTRA, INDIA</div>
+        <div className="map-top-chip"><span className="chip-dot" /> {(citycode || activeWorkspace).toUpperCase()} <span className="chip-divider">/</span> TREE CENSUS</div>
         <MapModeControls viewMode={viewMode} onChange={setView} />
         <TreeColorLegend />
         <div className="map-bottom-note">Drag to explore <span>·</span> Scroll to zoom <span>·</span> Click a tree to inspect</div>

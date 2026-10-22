@@ -11,17 +11,17 @@ export default function InventorySidebar({
   setHealthFilter,
   treesEnabled,
   setTreesEnabled,
+  treeLayer = TREE_LAYER,
 }) {
   return (
       <aside className="sidebar">
         <div className="brand-row">
           <div className="brand-mark">✳</div>
-          <div><div className="brand-name">canopy<span>.</span></div><div className="brand-subtitle">TREE INVENTORY EXPLORER</div></div>
+          <div><div className="brand-name" style={{ fontSize: "16px", lineHeight: "1.2" }}>3D Visualization of Tree Census<span>.</span></div><div className="brand-subtitle">TREE INVENTORY EXPLORER</div></div>
         </div>
         <header className="intro">
           <div className="eyebrow">GEOSPATIAL PROOF OF CONCEPT</div>
-          <h1>Nashik, tree by tree.</h1>
-          <p>Explore the live Nashik tree census with realistic, instanced 3D tree forms.</p>
+                    <p>Explore the live tree census with realistic, instanced 3D tree forms.</p>
         </header>
         <section className="metric-card">
           <div className="metric-top"><span>NASHIK TREE CENSUS</span><span className="live-dot" /></div>
@@ -63,7 +63,7 @@ export default function InventorySidebar({
         </section>
         <footer className="sidebar-footer">
           <div className="status-indicator" />
-          <div><strong>{status}</strong><small>GeoServer · {TREE_LAYER} · CC0 GLB models</small></div>
+          <div><strong>{status}</strong><small>GeoServer · {treeLayer} · CC0 GLB models</small></div>
         </footer>
       </aside>
   );
