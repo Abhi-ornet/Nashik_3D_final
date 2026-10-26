@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as maplibregl from 'maplibre-gl';
 
-import { createTreeLayer } from './map/createTreeLayer.js';
+import { createTreeLayer } from "./map/createTreeLayer.js";
 import { loadCityKml } from './data/kmlLoader.js';
 import {
   BASEMAP_STYLE_URL,

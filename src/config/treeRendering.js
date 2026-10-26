@@ -24,7 +24,7 @@ export const TREE_CUT_MODEL = '/models/tree-cut.glb';
 export const DENSITY_THRESHOLDS = {
   DETAIL: 5000,
   MID: 7500,
-  LOW_POLY: 30000,
+  LOW_POLY: 15000,
 };
 
 // Tier 3 (Showcase Low-Poly 3D: 7,501 - 16,000 trees)
